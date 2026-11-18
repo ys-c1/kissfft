@@ -1,0 +1,74 @@
+[
+ {
+  "id": "double-scalar",
+  "datatype": "double",
+  "openmp": false,
+  "family": "floating",
+  "parallel": "scalar",
+  "build_seconds": 0.06,
+  "n_runs": 48
+ },
+ {
+  "id": "double-openmp",
+  "datatype": "double",
+  "openmp": true,
+  "family": "floating",
+  "parallel": "openmp",
+  "build_seconds": 0.06,
+  "n_runs": 48
+ },
+ {
+  "id": "float-scalar",
+  "datatype": "float",
+  "openmp": false,
+  "family": "floating",
+  "parallel": "scalar",
+  "build_seconds": 0.057,
+  "n_runs": 48
+ },
+ {
+  "id": "float-openmp",
+  "datatype": "float",
+  "openmp": true,
+  "family": "floating",
+  "parallel": "openmp",
+  "build_seconds": 0.054,
+  "n_runs": 48
+ },
+ {
+  "id": "float-simd",
+  "datatype": "simd",
+  "openmp": false,
+  "family": "floating",
+  "parallel": "simd",
+  "build_seconds": 0.057,
+  "n_runs": 48
+ },
+ {
+  "id": "int16-scalar",
+  "datatype": "int16_t",
+  "openmp": false,
+  "family": "fixed16",
+  "parallel": "scalar",
+  "build_seconds": 0.058,
+  "n_runs": 48
+ },
+ {
+  "id": "int32-scalar",
+  "datatype": "int32_t",
+  "openmp": false,
+  "family": "fixed32",
+  "parallel": "scalar",
+  "build_seconds": 0.055,
+  "n_runs": 48
+ },
+ {
+  "id": "int32-openmp",
+  "datatype": "int32_t",
+  "openmp": true,
+  "family": "fixed32",
+  "parallel": "openmp",
+  "build_seconds": 0.054,
+  "n_runs": 48
+ }
+]

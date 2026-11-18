@@ -1,0 +1,39 @@
+[ 16%] Building C object CMakeFiles/kissfft.dir/kiss_fft.c.o
+[ 50%] Building C object CMakeFiles/kissfft.dir/kiss_fftndr.c.o
+[ 50%] Building C object CMakeFiles/kissfft.dir/kiss_fftnd.c.o
+[ 66%] Building C object CMakeFiles/kissfft.dir/kiss_fftr.c.o
+[ 83%] Building C object CMakeFiles/kissfft.dir/kfc.c.o
+/home/ys/feedback/uidreczz28bCcby8HIV/kiss_fftndr.c: In function ‘kiss_fftndr_alloc’:
+/home/ys/feedback/uidreczz28bCcby8HIV/kiss_fftndr.c:11:25: warning: comparison of integer expressions of different signedness: ‘size_t’ {aka ‘long unsigned int’} and ‘int’ [-Wsign-compare]
+   11 | #define MAX(x,y) ( ( (x)<(y) )?(y):(x) )
+      |                         ^
+/home/ys/feedback/uidreczz28bCcby8HIV/kiss_fftndr.c:57:9: note: in expansion of macro ‘MAX’
+   57 |         MAX( 2*dimOther , dimReal+2) * sizeof(kiss_fft_scalar)  // freq buffer for one pass
+      |         ^~~
+/home/ys/feedback/uidreczz28bCcby8HIV/kiss_fftndr.c:11:32: warning: operand of ‘?:’ changes signedness from ‘int’ to ‘size_t’ {aka ‘long unsigned int’} due to unsignedness of other operand [-Wsign-compare]
+   11 | #define MAX(x,y) ( ( (x)<(y) )?(y):(x) )
+      |                                ^~~
+/home/ys/feedback/uidreczz28bCcby8HIV/kiss_fftndr.c:57:9: note: in expansion of macro ‘MAX’
+   57 |         MAX( 2*dimOther , dimReal+2) * sizeof(kiss_fft_scalar)  // freq buffer for one pass
+      |         ^~~
+/home/ys/feedback/uidreczz28bCcby8HIV/kiss_fftndr.c: In function ‘kiss_fftndr’:
+/home/ys/feedback/uidreczz28bCcby8HIV/kiss_fftndr.c:11:25: warning: comparison of integer expressions of different signedness: ‘int’ and ‘size_t’ {aka ‘long unsigned int’} [-Wsign-compare]
+   11 | #define MAX(x,y) ( ( (x)<(y) )?(y):(x) )
+      |                         ^
+/home/ys/feedback/uidreczz28bCcby8HIV/kiss_fftndr.c:95:34: note: in expansion of macro ‘MAX’
+   95 |     kiss_fft_cpx * tmp2 = tmp1 + MAX(nrbins,dimOther);
+      |                                  ^~~
+/home/ys/feedback/uidreczz28bCcby8HIV/kiss_fftndr.c:11:36: warning: operand of ‘?:’ changes signedness from ‘int’ to ‘size_t’ {aka ‘long unsigned int’} due to unsignedness of other operand [-Wsign-compare]
+   11 | #define MAX(x,y) ( ( (x)<(y) )?(y):(x) )
+      |                                    ^~~
+/home/ys/feedback/uidreczz28bCcby8HIV/kiss_fftndr.c:95:34: note: in expansion of macro ‘MAX’
+   95 |     kiss_fft_cpx * tmp2 = tmp1 + MAX(nrbins,dimOther);
+      |                                  ^~~
+/home/ys/feedback/uidreczz28bCcby8HIV/kiss_fftndr.c:102:21: warning: comparison of integer expressions of different signedness: ‘size_t’ {aka ‘long unsigned int’} and ‘int’ [-Wsign-compare]
+  102 |         for (k2=0;k2<nrbins;++k2)
+      |                     ^
+/home/ys/feedback/uidreczz28bCcby8HIV/kiss_fftndr.c:106:17: warning: comparison of integer expressions of different signedness: ‘size_t’ {aka ‘long unsigned int’} and ‘int’ [-Wsign-compare]
+  106 |     for (k2=0;k2<nrbins;++k2) {
+      |                 ^
+[100%] Linking C static library libkissfft-float-openmp.a
+[100%] Built target kissfft
