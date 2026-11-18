@@ -120,6 +120,7 @@ message(STATUS "PKGINCLUDEDIR is ${PKGINCLUDEDIR}")
 
 add_library(kissfft
   kiss_fft.c
+  kiss_fft_batch.c
   kfc.c
   kiss_fftnd.c
   kiss_fftndr.c
@@ -308,6 +309,7 @@ install(TARGETS kissfft EXPORT kissfft
 
 install(FILES kiss_fft.h
               kissfft.hh
+              kiss_fft_batch.h
               kiss_fftnd.h
               kiss_fftndr.h
               kiss_fftr.h

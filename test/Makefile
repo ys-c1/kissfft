@@ -47,6 +47,7 @@ ifneq ($(KISSFFT_OPENMP),1)
 	TESTNDRALLOC = tndralloc-$(KISSFFT_DATATYPE)
 	TESTNDALIGN = tndalign-$(KISSFFT_DATATYPE)
 	TESTCUSTOMALLOC = tcustalloc-$(KISSFFT_DATATYPE)
+	TESTBATCH = tbatch-$(KISSFFT_DATATYPE)
 	TESTKFC = tkfc-$(KISSFFT_DATATYPE)
 	TESTFASTFILT = fastfilt-$(KISSFFT_DATATYPE)
 	TESTCPP = testcpp-$(KISSFFT_DATATYPE)
@@ -60,6 +61,7 @@ else
 	TESTNDRALLOC = tndralloc-$(KISSFFT_DATATYPE)-openmp
 	TESTNDALIGN = tndalign-$(KISSFFT_DATATYPE)-openmp
 	TESTCUSTOMALLOC = tcustalloc-$(KISSFFT_DATATYPE)-openmp
+	TESTBATCH = tbatch-$(KISSFFT_DATATYPE)-openmp
 	TESTKFC = tkfc-$(KISSFFT_DATATYPE)-openmp
 	TESTFASTFILT = fastfilt-$(KISSFFT_DATATYPE)-openmp
 	TESTCPP = testcpp-$(KISSFFT_DATATYPE)-openmp
@@ -111,7 +113,7 @@ endif
 # Target: "make all"
 #
 
-all: $(BENCHKISS) $(SELFTEST) $(BENCHFFTW) $(TESTREAL) $(TESTSIZEVAL) $(TESTNDRALLOC) $(TESTNDALIGN) $(TESTCUSTOMALLOC) $(TESTKFC) $(TESTFASTFILT)
+all: $(BENCHKISS) $(SELFTEST) $(BENCHFFTW) $(TESTREAL) $(TESTSIZEVAL) $(TESTNDRALLOC) $(TESTNDALIGN) $(TESTCUSTOMALLOC) $(TESTBATCH) $(TESTKFC) $(TESTFASTFILT)
 
 #
 # Individual test make rules
@@ -138,6 +140,10 @@ $(TESTNDALIGN): test_nd_alignment.c ../kiss_fftr.c ../kiss_fftnd.c ../kiss_fftnd
 
 # unity build: compiles the library sources itself with KISS_FFT_MALLOC/FREE overridden, so it must not link the library
 $(TESTCUSTOMALLOC): test_custom_alloc.c ../kiss_fft.c ../kiss_fftr.c ../kiss_fftnd.c ../kiss_fftndr.c ../kfc.c
+	$(CC) -o $@ $(CFLAGS) $(TYPEFLAGS) $< -lm
+
+# unity build: compiles the batch + core sources itself with a counting allocator, so it must not link the library
+$(TESTBATCH): test_batch.c ../kiss_fft.c ../kiss_fft_batch.c
 	$(CC) -o $@ $(CFLAGS) $(TYPEFLAGS) $< -lm
 
 $(BENCHKISS): benchkiss.c pstats.c
@@ -205,6 +211,8 @@ endif
 	@LD_LIBRARY_PATH="$(LD_LIBRARY_PATH):.." ./$(TESTNDALIGN)
 	$(warning ======custom KISS_FFT_MALLOC/KISS_FFT_FREE regression test (type= $(KISSFFT_DATATYPE) ))
 	@LD_LIBRARY_PATH="$(LD_LIBRARY_PATH):.." ./$(TESTCUSTOMALLOC)
+	$(warning ======multi-channel batch FFT acceptance test (type= $(KISSFFT_DATATYPE) ))
+	@LD_LIBRARY_PATH="$(LD_LIBRARY_PATH):.." ./$(TESTBATCH)
 	$(warning ======timing test (type=$(KISSFFT_DATATYPE)))
 	@LD_LIBRARY_PATH="$(LD_LIBRARY_PATH):.." ./$(BENCHKISS) -x $(NUMFFTS) -n $(NFFT)
 	@[ -x ./$(BENCHFFTW) ] && LD_LIBRARY_PATH="$(LD_LIBRARY_PATH):.." ./$(BENCHFFTW) -x $(NUMFFTS) -n $(NFFT) || true
@@ -216,4 +224,4 @@ endif
 #
 
 clean:
-	rm -f *~ bm-* st-* tr-* tsizeval-* tndralloc-* tndalign-* tcustalloc-* kf-* tkfc-* ff-* fastfilt-* *.pyc *.pyo *.dat testcpp-* testsimd testsimd-* _test_library_dummy _test_library_dummy.c
+	rm -f *~ bm-* st-* tr-* tsizeval-* tndralloc-* tndalign-* tcustalloc-* tbatch-* kf-* tkfc-* ff-* fastfilt-* *.pyc *.pyo *.dat testcpp-* testsimd testsimd-* _test_library_dummy _test_library_dummy.c
