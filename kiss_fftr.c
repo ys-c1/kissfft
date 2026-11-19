@@ -32,6 +32,8 @@ kiss_fftr_cfg kiss_fftr_alloc(int nfft,int inverse_fft,void * mem,size_t * lenme
     }
     nfft >>= 1;
 
+    /* size query only: mem == NULL with lenmem set makes kiss_fft_alloc
+     * report the required bytes without allocating */
     kiss_fft_alloc (nfft, inverse_fft, NULL, &subsize);
     memneeded = sizeof(struct kiss_fftr_state) + subsize + sizeof(kiss_fft_cpx) * ( (size_t)nfft * 3 / 2);
 
@@ -168,4 +170,206 @@ void kiss_fftri(kiss_fftr_cfg st,const kiss_fft_cpx *freqdata,kiss_fft_scalar *t
 #endif
     }
     kiss_fft (st->substate, st->tmpbuf, (kiss_fft_cpx *) timedata);
+}
+
+/* ------------------------------------------------------------------ */
+/* Config reuse pool, in-place entries and batch processing.          */
+/* ------------------------------------------------------------------ */
+
+struct kiss_fftr_pool_entry {
+    int nfft;
+    int inverse;
+    int in_use;
+    struct kiss_fftr_pool_entry *next;
+    kiss_fftr_cfg cfg; /* embedded right after this header, one block */
+};
+
+struct kiss_fftr_pool {
+    struct kiss_fftr_pool_entry *head;
+};
+
+kiss_fftr_pool_t kiss_fftr_pool_create(void)
+{
+    kiss_fftr_pool_t pool =
+        (kiss_fftr_pool_t) KISS_FFT_MALLOC(sizeof(struct kiss_fftr_pool));
+    if (pool == NULL) {
+        KISS_FFT_ERROR("kiss_fftr_pool_create: allocation failed.");
+        return NULL;
+    }
+    pool->head = NULL;
+    return pool;
+}
+
+void kiss_fftr_pool_destroy(kiss_fftr_pool_t pool)
+{
+    struct kiss_fftr_pool_entry *e;
+    if (pool == NULL)
+        return;
+    e = pool->head;
+    while (e != NULL) {
+        struct kiss_fftr_pool_entry *next = e->next;
+        /* entry header and embedded cfg live in a single allocation */
+        KISS_FFT_FREE(e);
+        e = next;
+    }
+    KISS_FFT_FREE(pool);
+}
+
+kiss_fftr_cfg kiss_fftr_pool_acquire(kiss_fftr_pool_t pool,
+                                     int nfft,
+                                     int inverse_fft)
+{
+    struct kiss_fftr_pool_entry *e;
+    size_t cfgsize = 0, need;
+    char *block;
+
+    if (pool == NULL || nfft <= 0 || (nfft & 1))
+        return NULL;
+
+    for (e = pool->head; e != NULL; e = e->next) {
+        if (!e->in_use && e->nfft == nfft && e->inverse == inverse_fft) {
+            e->in_use = 1;
+            return e->cfg;
+        }
+    }
+
+    /* find out how large the real-FFT config is, without allocating it */
+    if (kiss_fftr_alloc(nfft, inverse_fft, NULL, &cfgsize) == NULL &&
+        cfgsize == 0)
+        return NULL; /* invalid nfft */
+
+    /* one allocation holds the entry header and the whole config block */
+    need = sizeof(struct kiss_fftr_pool_entry) + cfgsize;
+    block = (char *) KISS_FFT_MALLOC(need);
+    if (block == NULL) {
+        KISS_FFT_ERROR("kiss_fftr_pool_acquire: allocation failed.");
+        return NULL;
+    }
+    e = (struct kiss_fftr_pool_entry *) block;
+    e->cfg = (kiss_fftr_cfg) (block + sizeof(struct kiss_fftr_pool_entry));
+    if (kiss_fftr_alloc(nfft, inverse_fft, e->cfg, &cfgsize) == NULL) {
+        KISS_FFT_FREE(e);
+        return NULL;
+    }
+    e->nfft = nfft;
+    e->inverse = inverse_fft;
+    e->in_use = 1;
+    e->next = pool->head;
+    pool->head = e;
+    return e->cfg;
+}
+
+void kiss_fftr_pool_release(kiss_fftr_pool_t pool, kiss_fftr_cfg cfg)
+{
+    struct kiss_fftr_pool_entry *e;
+    if (pool == NULL || cfg == NULL)
+        return;
+    for (e = pool->head; e != NULL; e = e->next) {
+        if (e->cfg == cfg) {
+            e->in_use = 0;
+            return;
+        }
+    }
+    KISS_FFT_ERROR("kiss_fftr_pool_release: cfg does not belong to pool.");
+}
+
+void kiss_fftr_inplace(kiss_fftr_cfg st, kiss_fft_scalar *buf)
+{
+    /* The forward transform only reads timedata through the nfft/2-point
+     * complex sub-FFT and the post-processing loop, both of which finish
+     * before freqdata (which starts at the same address) is written. The
+     * state's own tmpbuf holds every intermediate, so reusing the caller
+     * buffer for the output needs no extra allocation. */
+    kiss_fftr(st, buf, (kiss_fft_cpx *) buf);
+}
+
+void kiss_fftr_inplacei(kiss_fftr_cfg st, kiss_fft_scalar *buf)
+{
+    /* The inverse first builds tmpbuf from freqdata and only then runs
+     * the sub-FFT into timedata, so sharing one buffer is safe. */
+    kiss_fftri(st, (const kiss_fft_cpx *) buf, buf);
+}
+
+/* Run one transform per segment, grouping segments of equal nfft so the
+ * config for a length is acquired once and reused for the whole group.
+ * No scratch storage is allocated: each segment only checks whether an
+ * earlier segment already represents its length. */
+static int kiss_fftr_batch_run(kiss_fftr_pool_t pool,
+                               const kiss_fftr_batch_seg *segs,
+                               int nseg,
+                               int inverse_fft)
+{
+    int i, j, done = 0;
+    if (pool == NULL || segs == NULL || nseg <= 0)
+        return 0;
+
+    /* fast path: the common "N equal-length segments" case needs no
+     * grouping scan at all -- one config for the whole batch */
+    {
+        int common = segs[0].nfft;
+        int uniform = (common > 0 && !(common & 1) &&
+                       segs[0].timedata != NULL && segs[0].freqdata != NULL);
+        for (i = 1; i < nseg && uniform; ++i)
+            uniform = (segs[i].nfft == common &&
+                       segs[i].timedata != NULL && segs[i].freqdata != NULL);
+        if (uniform) {
+            kiss_fftr_cfg cfg = kiss_fftr_pool_acquire(pool, common,
+                                                       inverse_fft);
+            if (cfg == NULL)
+                return 0;
+            for (i = 0; i < nseg; ++i) {
+                if (inverse_fft)
+                    kiss_fftri(cfg, segs[i].freqdata, segs[i].timedata);
+                else
+                    kiss_fftr(cfg, segs[i].timedata, segs[i].freqdata);
+            }
+            kiss_fftr_pool_release(pool, cfg);
+            return nseg;
+        }
+    }
+
+    /* general path: mixed lengths, grouped without extra allocation.
+     * A valid earlier group leader always has non-NULL buffers, so a
+     * skipped (invalid) index cannot be the leader of a later length. */
+    for (i = 0; i < nseg; ++i) {
+        kiss_fftr_cfg cfg;
+        if (segs[i].nfft <= 0 || (segs[i].nfft & 1) ||
+            segs[i].timedata == NULL || segs[i].freqdata == NULL)
+            continue;
+        for (j = 0; j < i; ++j) {
+            if (segs[j].nfft == segs[i].nfft)
+                break;
+        }
+        if (j < i)
+            continue;
+
+        cfg = kiss_fftr_pool_acquire(pool, segs[i].nfft, inverse_fft);
+        if (cfg == NULL)
+            continue;
+        for (j = i; j < nseg; ++j) {
+            if (segs[j].nfft != segs[i].nfft)
+                continue;
+            if (inverse_fft)
+                kiss_fftri(cfg, segs[j].freqdata, segs[j].timedata);
+            else
+                kiss_fftr(cfg, segs[j].timedata, segs[j].freqdata);
+            ++done;
+        }
+        kiss_fftr_pool_release(pool, cfg);
+    }
+    return done;
+}
+
+int kiss_fftr_batch(kiss_fftr_pool_t pool,
+                    const kiss_fftr_batch_seg *segs,
+                    int nseg)
+{
+    return kiss_fftr_batch_run(pool, segs, nseg, 0);
+}
+
+int kiss_fftr_batchi(kiss_fftr_pool_t pool,
+                     const kiss_fftr_batch_seg *segs,
+                     int nseg)
+{
+    return kiss_fftr_batch_run(pool, segs, nseg, 1);
 }
